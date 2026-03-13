@@ -1,0 +1,1097 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "version": 1,
+    "install": {
+      "boto3": {
+        "pkg-path": "python311Packages.boto3"
+      },
+      "clickhouse": {
+        "pkg-path": "clickhouse"
+      },
+      "docker": {
+        "pkg-path": "docker"
+      },
+      "docker-compose": {
+        "pkg-path": "docker-compose"
+      },
+      "duckdb": {
+        "pkg-path": "python311Packages.duckdb"
+      },
+      "minio": {
+        "pkg-path": "minio"
+      },
+      "pandas": {
+        "pkg-path": "python311Packages.pandas"
+      },
+      "pip": {
+        "pkg-path": "python311Packages.pip"
+      },
+      "polars": {
+        "pkg-path": "python311Packages.polars"
+      },
+      "pyarrow": {
+        "pkg-path": "python311Packages.pyarrow"
+      },
+      "pyiceberg": {
+        "pkg-path": "python311Packages.pyiceberg",
+        "systems": [
+          "x86_64-linux"
+        ]
+      },
+      "python": {
+        "pkg-path": "python311Full"
+      },
+      "requests": {
+        "pkg-path": "python311Packages.requests"
+      },
+      "s3fs": {
+        "pkg-path": "python311Packages.s3fs"
+      },
+      "sqlalchemy": {
+        "pkg-path": "python311Packages.sqlalchemy"
+      },
+      "uv": {
+        "pkg-path": "uv"
+      }
+    },
+    "vars": {
+      "CLICKHOUSE_HOST": "127.0.0.1",
+      "CLICKHOUSE_HTTP_PORT": "8123",
+      "CLICKHOUSE_TCP_PORT": "9002",
+      "ICEBERG_CATALOG_NAME": "local",
+      "ICEBERG_WAREHOUSE": "s3://warehouse",
+      "MINIO_CONSOLE_PORT": "9001",
+      "MINIO_HOST": "127.0.0.1",
+      "MINIO_PORT": "9000",
+      "MINIO_ROOT_PASSWORD": "minioadmin",
+      "MINIO_ROOT_USER": "minioadmin",
+      "S3_ENDPOINT_URL": "http://127.0.0.1:9000",
+      "S3_REGION": "us-east-1"
+    },
+    "hook": {
+      "on-activate": "mkdir -p \"$FLOX_ENV_CACHE/logs\"\nmkdir -p \"$FLOX_ENV_CACHE/minio/data\"\nmkdir -p \"$FLOX_ENV_CACHE/clickhouse\"\nmkdir -p \"$FLOX_ENV_PROJECT/airbyte\"\n"
+    },
+    "profile": {
+      "common": "de_airbyte_up() {\n  docker compose -f \"${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}\" up -d\n}\n\nde_airbyte_down() {\n  docker compose -f \"${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}\" down\n}\n\nde_clickhouse_query() {\n  clickhouse client --host \"$CLICKHOUSE_HOST\" --port \"$CLICKHOUSE_TCP_PORT\" --query \"$*\"\n}\n\nde_iceberg_env() {\n  printf 'S3 endpoint: %s\\nWarehouse: %s\\nCatalog: %s\\n' \"$S3_ENDPOINT_URL\" \"$ICEBERG_WAREHOUSE\" \"$ICEBERG_CATALOG_NAME\"\n}\n"
+    },
+    "options": {
+      "systems": [
+        "x86_64-linux",
+        "aarch64-linux"
+      ]
+    },
+    "services": {
+      "airbyte": {
+        "command": "set -euo pipefail\nairbyte_compose=\"${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}\"\nif [ ! -f \"$airbyte_compose\" ]; then\n  echo \"Airbyte compose file not found: $airbyte_compose\" >&2\n  echo \"Create it at that path or override AIRBYTE_COMPOSE_FILE when activating.\" >&2\n  exit 1\nfi\nexec docker compose -f \"$airbyte_compose\" up\n",
+        "is-daemon": true,
+        "shutdown": {
+          "command": "airbyte_compose=\"${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}\"\nif [ -f \"$airbyte_compose\" ]; then\n  exec docker compose -f \"$airbyte_compose\" down\nfi\n"
+        }
+      },
+      "clickhouse": {
+        "command": "exec clickhouse server \\\n  --path \"$FLOX_ENV_CACHE/clickhouse\" \\\n  --listen_host \"$CLICKHOUSE_HOST\" \\\n  --http_port \"$CLICKHOUSE_HTTP_PORT\" \\\n  --tcp_port \"$CLICKHOUSE_TCP_PORT\"\n",
+        "is-daemon": true
+      },
+      "minio": {
+        "command": "export MINIO_ROOT_USER\nexport MINIO_ROOT_PASSWORD\nexec minio server \"$FLOX_ENV_CACHE/minio/data\" \\\n  --address \"$MINIO_HOST:$MINIO_PORT\" \\\n  --console-address \"$MINIO_HOST:$MINIO_CONSOLE_PORT\"\n",
+        "is-daemon": true
+      }
+    },
+    "build": {
+      "import-check": {
+        "command": "mkdir -p \"$out\"\npython - << 'PY'\nimport importlib\n\nmodules = [\n    \"pandas\",\n    \"polars\",\n    \"pyarrow\",\n    \"duckdb\",\n    \"sqlalchemy\",\n    \"boto3\",\n    \"s3fs\",\n    \"pyiceberg\",\n]\nmissing = [m for m in modules if importlib.util.find_spec(m) is None]\nif missing:\n    raise SystemExit(f\"Missing imports: {', '.join(missing)}\")\n\nprint(\"Data engineering Python imports are available\")\nPY\n"
+      }
+    }
+  },
+  "packages": [
+    {
+      "attr_path": "python311Packages.boto3",
+      "broken": false,
+      "derivation": "/nix/store/wysk0b67bn9isjd7p8wqzhkrxppjjd1k-python3.11-boto3-1.35.30.drv",
+      "description": "AWS SDK for Python",
+      "install_id": "boto3",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-boto3-1.35.30",
+      "pname": "boto3",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3.11-boto3-1.35.30",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/7md2mqhhwzq4xz3xprn1xp8qy0grcbab-python3.11-boto3-1.35.30-dist",
+        "out": "/nix/store/cy3yk59jghggi2md2kiyrsqzy91vb32d-python3.11-boto3-1.35.30"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.boto3",
+      "broken": false,
+      "derivation": "/nix/store/24d562wnky6cv2yaacivb171pac30nj9-python3.11-boto3-1.35.30.drv",
+      "description": "AWS SDK for Python",
+      "install_id": "boto3",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-boto3-1.35.30",
+      "pname": "boto3",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3.11-boto3-1.35.30",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/9cgignca9wfn4x8wk8c525p066s5g5r5-python3.11-boto3-1.35.30-dist",
+        "out": "/nix/store/206yjj42islj6hf8vyqcbxd9c9l00340-python3.11-boto3-1.35.30"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "clickhouse",
+      "broken": false,
+      "derivation": "/nix/store/0ppf0sij1gvl6rr7xfa65lp8m3rh0gya-clickhouse-24.3.7.30.drv",
+      "description": "Column-oriented database management system",
+      "install_id": "clickhouse",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "clickhouse-24.3.7.30",
+      "pname": "clickhouse",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "24.3.7.30",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/q1fpf1y4xbifnw02l4ivrh8mjvzl2dnv-clickhouse-24.3.7.30"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "clickhouse",
+      "broken": false,
+      "derivation": "/nix/store/rlc4d13m4r3zl6b4i6bpw8h32mlmz6pw-clickhouse-24.3.7.30.drv",
+      "description": "Column-oriented database management system",
+      "install_id": "clickhouse",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "clickhouse-24.3.7.30",
+      "pname": "clickhouse",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "24.3.7.30",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/dnq75lkaznh21z0k7imv1xqqnagq3rqa-clickhouse-24.3.7.30"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "docker",
+      "broken": false,
+      "derivation": "/nix/store/414xiwbcs1j15fm5y2g9q9cqyzl1g2fw-docker-27.4.0.drv",
+      "description": "Open source project to pack, ship and run any application as a lightweight container",
+      "install_id": "docker",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "docker-27.4.0",
+      "pname": "docker",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "27.4.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wq0ig7nik2gxlq0nj8kcya4h0ffp699h-docker-27.4.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "docker",
+      "broken": false,
+      "derivation": "/nix/store/4v602svdbpl3qzwkk0viwwhdzkiixhk6-docker-27.4.0.drv",
+      "description": "Open source project to pack, ship and run any application as a lightweight container",
+      "install_id": "docker",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "docker-27.4.0",
+      "pname": "docker",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "27.4.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/nclhiwibcrx7kcqchnp74nxnc1ic7831-docker-27.4.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "docker-compose",
+      "broken": false,
+      "derivation": "/nix/store/nj7y6phhhh4460ra75j8wp1m63rbcdal-docker-compose-2.31.0.drv",
+      "description": "Docker CLI plugin to define and run multi-container applications with Docker",
+      "install_id": "docker-compose",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "docker-compose-2.31.0",
+      "pname": "docker-compose",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.31.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/6s1cd9i36z9b0lby9gn20hi17vr3apy8-docker-compose-2.31.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "docker-compose",
+      "broken": false,
+      "derivation": "/nix/store/g3649mlabirgi480klcwf0jxglvxhyxv-docker-compose-2.31.0.drv",
+      "description": "Docker CLI plugin to define and run multi-container applications with Docker",
+      "install_id": "docker-compose",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "docker-compose-2.31.0",
+      "pname": "docker-compose",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.31.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/74j2n6s0c2dzjv06f17g5hbsxw71dc70-docker-compose-2.31.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.duckdb",
+      "broken": false,
+      "derivation": "/nix/store/464qadgvq2sn27grwzd5skp84r6jcq97-python3.11-duckdb-1.1.3.drv",
+      "description": "Python binding for DuckDB",
+      "install_id": "duckdb",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-duckdb-1.1.3",
+      "pname": "duckdb",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "1.1.3",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/nzxm7cg4pif0fap58jyp53s9wgsn49m3-python3.11-duckdb-1.1.3-dist",
+        "out": "/nix/store/qvmy4wbx52yss49c1w2av3mczkz0rh3r-python3.11-duckdb-1.1.3"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.duckdb",
+      "broken": false,
+      "derivation": "/nix/store/jawv1pyprvhfp4mkxjy3mnndfi0qhj29-python3.11-duckdb-1.1.3.drv",
+      "description": "Python binding for DuckDB",
+      "install_id": "duckdb",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-duckdb-1.1.3",
+      "pname": "duckdb",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "1.1.3",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/cz1q81yzjj525rcmrfc9qdzdm3fq7hyr-python3.11-duckdb-1.1.3-dist",
+        "out": "/nix/store/fyibr5vlaqcb5b867zfny0dc64crp013-python3.11-duckdb-1.1.3"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "minio",
+      "broken": false,
+      "derivation": "/nix/store/k8249cy6i1sj693llirclmihzd15wm5m-minio-2024-12-13T22-19-12Z.drv",
+      "description": "S3-compatible object storage server",
+      "install_id": "minio",
+      "license": "AGPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "minio-2024-12-13T22-19-12Z",
+      "pname": "minio",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2024-12-13T22-19-12Z",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/mjdnpwglk8lq6kap92bgd9v604gawxb8-minio-2024-12-13T22-19-12Z"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "minio",
+      "broken": false,
+      "derivation": "/nix/store/7bb03sk17x315fsd3hm9skab6l0f9zi4-minio-2024-12-13T22-19-12Z.drv",
+      "description": "S3-compatible object storage server",
+      "install_id": "minio",
+      "license": "AGPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "minio-2024-12-13T22-19-12Z",
+      "pname": "minio",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2024-12-13T22-19-12Z",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/d2mlraczp371w68kz1cm9a2byr6ss1i0-minio-2024-12-13T22-19-12Z"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pandas",
+      "broken": false,
+      "derivation": "/nix/store/bz83qlxvhjpivcwkpvxn3l08s8zpm5yg-python3.11-pandas-2.2.3.drv",
+      "description": "Powerful data structures for data analysis, time series, and statistics",
+      "install_id": "pandas",
+      "license": "BSD-3-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-pandas-2.2.3",
+      "pname": "pandas",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.2.3",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/dfp2pa2gak4d1yriyccva8hfsapziybk-python3.11-pandas-2.2.3-dist",
+        "out": "/nix/store/zrzxzmmy9g7hmjci27blf86szcjwag66-python3.11-pandas-2.2.3"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pandas",
+      "broken": false,
+      "derivation": "/nix/store/yv6algw00xwk5g1rihi688l7vwkgdva6-python3.11-pandas-2.2.3.drv",
+      "description": "Powerful data structures for data analysis, time series, and statistics",
+      "install_id": "pandas",
+      "license": "BSD-3-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-pandas-2.2.3",
+      "pname": "pandas",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.2.3",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/b4krw8gg7clhwzhhbgk5c7pyb9wmjhmv-python3.11-pandas-2.2.3-dist",
+        "out": "/nix/store/ykj2zgln73lsm8wr797wsc8b2mpdp6k8-python3.11-pandas-2.2.3"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pip",
+      "broken": false,
+      "derivation": "/nix/store/pyk770l29hhkpag7p2vww40gyq51lx0j-python3.11-pip-24.0.drv",
+      "description": "PyPA recommended tool for installing Python packages",
+      "install_id": "pip",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-pip-24.0",
+      "pname": "pip",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "24.0",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/9ai3zc1ml1hpl6r5a0wz20j73jzqc19k-python3.11-pip-24.0-dist",
+        "man": "/nix/store/l6h3wn620pnsw00b3izh7qkh63v2h2mm-python3.11-pip-24.0-man",
+        "out": "/nix/store/n1878qvhhl7a1238h52syhpyn3vpr9ap-python3.11-pip-24.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pip",
+      "broken": false,
+      "derivation": "/nix/store/14llrjh9jq8kfdj4mkgibp4gzprxrrcr-python3.11-pip-24.0.drv",
+      "description": "PyPA recommended tool for installing Python packages",
+      "install_id": "pip",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-pip-24.0",
+      "pname": "pip",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "24.0",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/ifs6g0gvihqkn6kbs91n88hxai1i3jcj-python3.11-pip-24.0-dist",
+        "man": "/nix/store/5qlaabn7jli0d2djawr8ld8l6bi8jwwi-python3.11-pip-24.0-man",
+        "out": "/nix/store/9hhh5rh3qihyrh0y0wid9xl20i0z5pfq-python3.11-pip-24.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.polars",
+      "broken": false,
+      "derivation": "/nix/store/i0lfhi29qpz59c9yalf1q5khjv04sgm0-python3.11-polars-1.12.0.drv",
+      "description": "Dataframes powered by a multithreaded, vectorized query engine, written in Rust",
+      "install_id": "polars",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-polars-1.12.0",
+      "pname": "polars",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "1.12.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/wq2s5xb3pxkvcrvq51xqh9sz3c58iylq-python3.11-polars-1.12.0-dist",
+        "out": "/nix/store/lfs00n0g7k9ccfnpmirni14xdrdqg1mh-python3.11-polars-1.12.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.polars",
+      "broken": false,
+      "derivation": "/nix/store/crgci69jxzxd5wlwlriqmc9362v5z8g4-python3.11-polars-1.12.0.drv",
+      "description": "Dataframes powered by a multithreaded, vectorized query engine, written in Rust",
+      "install_id": "polars",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-polars-1.12.0",
+      "pname": "polars",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "1.12.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/simlrnigv4g8570wvgp3y30vm2xk5qkw-python3.11-polars-1.12.0-dist",
+        "out": "/nix/store/ih990llw7h6qjf4ps5a7jzp1sj6c6akj-python3.11-polars-1.12.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pyarrow",
+      "broken": false,
+      "derivation": "/nix/store/i60qhg70sjg4i712n9w5wh5zbxag9p27-python3.11-pyarrow-18.0.0.drv",
+      "description": "Cross-language development platform for in-memory data",
+      "install_id": "pyarrow",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-pyarrow-18.0.0",
+      "pname": "pyarrow",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "18.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/zhwkkkqii0s766n5qw93p04z68qjvr13-python3.11-pyarrow-18.0.0-dist",
+        "out": "/nix/store/g8pcfqkprzxpvi8067mqqfahcx4prc65-python3.11-pyarrow-18.0.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pyarrow",
+      "broken": false,
+      "derivation": "/nix/store/zipqxf3bnmpc5in13ifh7agdqivpzaqh-python3.11-pyarrow-18.0.0.drv",
+      "description": "Cross-language development platform for in-memory data",
+      "install_id": "pyarrow",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-pyarrow-18.0.0",
+      "pname": "pyarrow",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "18.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/hv3di1zwxv08rkfr47ab3hkh5zgk71r0-python3.11-pyarrow-18.0.0-dist",
+        "out": "/nix/store/lxldyljhn1x4v2zbrrv8xvfp5ai13y3g-python3.11-pyarrow-18.0.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.pyiceberg",
+      "broken": false,
+      "derivation": "/nix/store/hdnnmbb871g92613gxwq2cli20l61y0f-python3.11-iceberg-python-0.8.1.drv",
+      "description": "Python library for programmatic access to Apache Iceberg",
+      "install_id": "pyiceberg",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-iceberg-python-0.8.1",
+      "pname": "pyiceberg",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.8.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/kzmwsh4l3pmwy73p1fwkb5g8ps8bpfv2-python3.11-iceberg-python-0.8.1-dist",
+        "out": "/nix/store/563pfx8b16ih6lv58kgygbixn8wd8y33-python3.11-iceberg-python-0.8.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Full",
+      "broken": false,
+      "derivation": "/nix/store/573mx8zvlgqi7xvx13qqv1m7a066hq19-python3-3.11.10.drv",
+      "description": "High-level dynamically-typed programming language",
+      "install_id": "python",
+      "license": "Python-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3-3.11.10",
+      "pname": "python311Full",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3-3.11.10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/a3pynz6m1cyaphjw69rs3ydyff8pggxw-python3-3.11.10-debug",
+        "out": "/nix/store/yl9b2gjn6abrikqsmp9mdklb838s628r-python3-3.11.10"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Full",
+      "broken": false,
+      "derivation": "/nix/store/rpmfx3kfdqv7ag48zb5cik8dn3yhn01p-python3-3.11.10.drv",
+      "description": "High-level dynamically-typed programming language",
+      "install_id": "python",
+      "license": "Python-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3-3.11.10",
+      "pname": "python311Full",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "python3-3.11.10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/dvlkp9spwzhvfi3qi67cxb2a7lps2i8d-python3-3.11.10-debug",
+        "out": "/nix/store/clx0mcir7qw8zk36zbr4jra789g3knf6-python3-3.11.10"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.requests",
+      "broken": false,
+      "derivation": "/nix/store/br1700cxhcs8h6k5ri0kdb3x4lhn1swn-python3.11-requests-2.32.3.drv",
+      "description": "HTTP library for Python",
+      "install_id": "requests",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-requests-2.32.3",
+      "pname": "requests",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.32.3",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/b8cpavdss5ynjipip41nj3ay22yra58g-python3.11-requests-2.32.3-dist",
+        "out": "/nix/store/k80k39my519hph86j0yirhk3f8jsna3m-python3.11-requests-2.32.3"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.requests",
+      "broken": false,
+      "derivation": "/nix/store/4jv5wksb2sg37s60b8dd8iy0s5i259l4-python3.11-requests-2.32.3.drv",
+      "description": "HTTP library for Python",
+      "install_id": "requests",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-requests-2.32.3",
+      "pname": "requests",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.32.3",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/2xa9mlpngcvy55sy42walblpp7a4amf6-python3.11-requests-2.32.3-dist",
+        "out": "/nix/store/43xifg5xlazqdkl0nipjh1mahnhj7lsr-python3.11-requests-2.32.3"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.s3fs",
+      "broken": false,
+      "derivation": "/nix/store/l0zch1v3x9s1grg3cjakyqivvmx28j8y-python3.11-s3fs-2024.9.0.drv",
+      "description": "Pythonic file interface for S3",
+      "install_id": "s3fs",
+      "license": "BSD-3-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-s3fs-2024.9.0",
+      "pname": "s3fs",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2024.9.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/1b0bh4hhhr2r7mb2l9qjc0asn4xmbfk0-python3.11-s3fs-2024.9.0-dist",
+        "out": "/nix/store/avhs2yyb26z69g0ny25yx00sb6b4hnir-python3.11-s3fs-2024.9.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.s3fs",
+      "broken": false,
+      "derivation": "/nix/store/aqjx6kvqjvj9y717rj8nqvrjl6ngqxin-python3.11-s3fs-2024.9.0.drv",
+      "description": "Pythonic file interface for S3",
+      "install_id": "s3fs",
+      "license": "BSD-3-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-s3fs-2024.9.0",
+      "pname": "s3fs",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2024.9.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/lhndls5x7b95spxggl9s6mv0d9zjb9im-python3.11-s3fs-2024.9.0-dist",
+        "out": "/nix/store/a3p3hsdx9051rq49dd8h5gk7zv2g1561-python3.11-s3fs-2024.9.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.sqlalchemy",
+      "broken": false,
+      "derivation": "/nix/store/m4ra0jslkhpj9mmah8x5p30kl9598v3c-python3.11-sqlalchemy-2.0.34.drv",
+      "description": "Python SQL toolkit and Object Relational Mapper",
+      "install_id": "sqlalchemy",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-sqlalchemy-2.0.34",
+      "pname": "sqlalchemy",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.0.34",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/sl2fm8vs34ykshsj866b4ay9si5bx1nh-python3.11-sqlalchemy-2.0.34-dist",
+        "out": "/nix/store/2dra9naw6vlc7f9f6cw4m6h6mywj7nyd-python3.11-sqlalchemy-2.0.34"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "python311Packages.sqlalchemy",
+      "broken": false,
+      "derivation": "/nix/store/njq4zkrsnj9yrb5a8qigsdyxpyznswsz-python3.11-sqlalchemy-2.0.34.drv",
+      "description": "Python SQL toolkit and Object Relational Mapper",
+      "install_id": "sqlalchemy",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "python3.11-sqlalchemy-2.0.34",
+      "pname": "sqlalchemy",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "2.0.34",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/325m93lsd654d05ncjg7drznmmsigiaf-python3.11-sqlalchemy-2.0.34-dist",
+        "out": "/nix/store/vywmai1ygy1f0qmx7rqa8myxf59jxqic-python3.11-sqlalchemy-2.0.34"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "uv",
+      "broken": false,
+      "derivation": "/nix/store/n0wd65svgkcfzrf65gpznvjfzxk91gds-uv-0.4.30.drv",
+      "description": "Extremely fast Python package installer and resolver, written in Rust",
+      "install_id": "uv",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "uv-0.4.30",
+      "pname": "uv",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.4.30",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/i1rvg12ibvdmbnfjdfzi02n273sz659k-uv-0.4.30-dist",
+        "out": "/nix/store/xwmpvkhkxvbibbkfpphijw85l4dxrd6m-uv-0.4.30"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "uv",
+      "broken": false,
+      "derivation": "/nix/store/93b0acjap207px8ibnfyd6i3r69dfb7s-uv-0.4.30.drv",
+      "description": "Extremely fast Python package installer and resolver, written in Rust",
+      "install_id": "uv",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "name": "uv-0.4.30",
+      "pname": "uv",
+      "rev": "d70bd19e0a38ad4790d3913bf08fcbfc9eeca507",
+      "rev_count": 724962,
+      "rev_date": "2024-12-19T23:01:11Z",
+      "scrape_date": "2024-12-23T03:54:12Z",
+      "stabilities": [
+        "staging",
+        "unstable",
+        "stable"
+      ],
+      "unfree": false,
+      "version": "0.4.30",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/93m90v0vlxwmz04pia4hj7ni791x65rv-uv-0.4.30-dist",
+        "out": "/nix/store/w7cs06nn9vvk8a59nv48y4biv9zzv43x-uv-0.4.30"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}

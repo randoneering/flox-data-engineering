@@ -1,0 +1,138 @@
+version = 1
+[install]
+# Base Python toolchain
+python.pkg-path = "python311Full"
+uv.pkg-path = "uv"
+pip.pkg-path = "python311Packages.pip"
+
+# Common Python libraries for data engineering
+pandas.pkg-path = "python311Packages.pandas"
+polars.pkg-path = "python311Packages.polars"
+pyarrow.pkg-path = "python311Packages.pyarrow"
+duckdb.pkg-path = "python311Packages.duckdb"
+sqlalchemy.pkg-path = "python311Packages.sqlalchemy"
+requests.pkg-path = "python311Packages.requests"
+boto3.pkg-path = "python311Packages.boto3"
+s3fs.pkg-path = "python311Packages.s3fs"
+pyiceberg.pkg-path = "python311Packages.pyiceberg"
+pyiceberg.systems = ["x86_64-linux"]
+
+# Local service and workflow tooling
+docker.pkg-path = "docker"
+docker-compose.pkg-path = "docker-compose"
+minio.pkg-path = "minio"
+clickhouse.pkg-path = "clickhouse"
+
+[vars]
+# S3-compatible object storage (MinIO)
+MINIO_HOST = "127.0.0.1"
+MINIO_PORT = "9000"
+MINIO_CONSOLE_PORT = "9001"
+MINIO_ROOT_USER = "minioadmin"
+MINIO_ROOT_PASSWORD = "minioadmin"
+S3_ENDPOINT_URL = "http://127.0.0.1:9000"
+S3_REGION = "us-east-1"
+
+# Iceberg catalog defaults
+ICEBERG_CATALOG_NAME = "local"
+ICEBERG_WAREHOUSE = "s3://warehouse"
+
+# ClickHouse local analytics
+CLICKHOUSE_HOST = "127.0.0.1"
+CLICKHOUSE_HTTP_PORT = "8123"
+CLICKHOUSE_TCP_PORT = "9002"
+
+[hook]
+on-activate = '''
+mkdir -p "$FLOX_ENV_CACHE/logs"
+mkdir -p "$FLOX_ENV_CACHE/minio/data"
+mkdir -p "$FLOX_ENV_CACHE/clickhouse"
+mkdir -p "$FLOX_ENV_PROJECT/airbyte"
+'''
+
+[profile]
+common = '''
+de_airbyte_up() {
+  docker compose -f "${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}" up -d
+}
+
+de_airbyte_down() {
+  docker compose -f "${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}" down
+}
+
+de_clickhouse_query() {
+  clickhouse client --host "$CLICKHOUSE_HOST" --port "$CLICKHOUSE_TCP_PORT" --query "$*"
+}
+
+de_iceberg_env() {
+  printf 'S3 endpoint: %s\nWarehouse: %s\nCatalog: %s\n' "$S3_ENDPOINT_URL" "$ICEBERG_WAREHOUSE" "$ICEBERG_CATALOG_NAME"
+}
+'''
+
+[services.minio]
+command = '''
+export MINIO_ROOT_USER
+export MINIO_ROOT_PASSWORD
+exec minio server "$FLOX_ENV_CACHE/minio/data" \
+  --address "$MINIO_HOST:$MINIO_PORT" \
+  --console-address "$MINIO_HOST:$MINIO_CONSOLE_PORT"
+'''
+is-daemon = true
+
+[services.clickhouse]
+command = '''
+exec clickhouse server \
+  --path "$FLOX_ENV_CACHE/clickhouse" \
+  --listen_host "$CLICKHOUSE_HOST" \
+  --http_port "$CLICKHOUSE_HTTP_PORT" \
+  --tcp_port "$CLICKHOUSE_TCP_PORT"
+'''
+is-daemon = true
+
+[services.airbyte]
+command = '''
+set -euo pipefail
+airbyte_compose="${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}"
+if [ ! -f "$airbyte_compose" ]; then
+  echo "Airbyte compose file not found: $airbyte_compose" >&2
+  echo "Create it at that path or override AIRBYTE_COMPOSE_FILE when activating." >&2
+  exit 1
+fi
+exec docker compose -f "$airbyte_compose" up
+'''
+is-daemon = true
+
+[services.airbyte.shutdown]
+command = '''
+airbyte_compose="${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}"
+if [ -f "$airbyte_compose" ]; then
+  exec docker compose -f "$airbyte_compose" down
+fi
+'''
+
+[build.import-check]
+command = '''
+mkdir -p "$out"
+python - << 'PY'
+import importlib
+
+modules = [
+    "pandas",
+    "polars",
+    "pyarrow",
+    "duckdb",
+    "sqlalchemy",
+    "boto3",
+    "s3fs",
+    "pyiceberg",
+]
+missing = [m for m in modules if importlib.util.find_spec(m) is None]
+if missing:
+    raise SystemExit(f"Missing imports: {', '.join(missing)}")
+
+print("Data engineering Python imports are available")
+PY
+'''
+
+[options]
+systems = ["x86_64-linux", "aarch64-linux"]
