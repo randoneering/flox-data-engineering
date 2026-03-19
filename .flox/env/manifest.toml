@@ -1,27 +1,41 @@
-version = 1
+schema-version = "1.10.0"
 [install]
 # Base Python toolchain
 python.pkg-path = "python311Full"
+python.outputs = "all"
 uv.pkg-path = "uv"
+uv.outputs = "all"
 pip.pkg-path = "python311Packages.pip"
+pip.outputs = "all"
 
 # Common Python libraries for data engineering
 pandas.pkg-path = "python311Packages.pandas"
+pandas.outputs = "all"
 polars.pkg-path = "python311Packages.polars"
+polars.outputs = "all"
 pyarrow.pkg-path = "python311Packages.pyarrow"
+pyarrow.outputs = "all"
 duckdb.pkg-path = "python311Packages.duckdb"
+duckdb.outputs = "all"
 sqlalchemy.pkg-path = "python311Packages.sqlalchemy"
+sqlalchemy.outputs = "all"
 requests.pkg-path = "python311Packages.requests"
+requests.outputs = "all"
 boto3.pkg-path = "python311Packages.boto3"
+boto3.outputs = "all"
 s3fs.pkg-path = "python311Packages.s3fs"
+s3fs.outputs = "all"
 pyiceberg.pkg-path = "python311Packages.pyiceberg"
 pyiceberg.systems = ["x86_64-linux"]
+pyiceberg.outputs = "all"
 
 # Local service and workflow tooling
 docker.pkg-path = "docker"
 docker-compose.pkg-path = "docker-compose"
 minio.pkg-path = "minio"
 clickhouse.pkg-path = "clickhouse"
+flox-mcp-server.pkg-path = "flox/flox-mcp-server"
+flox-mcp-server.pkg-group = "flox-mcp-server"
 
 [vars]
 # S3-compatible object storage (MinIO)
@@ -46,7 +60,10 @@ CLICKHOUSE_TCP_PORT = "9002"
 on-activate = '''
 mkdir -p "$FLOX_ENV_CACHE/logs"
 mkdir -p "$FLOX_ENV_CACHE/minio/data"
-mkdir -p "$FLOX_ENV_CACHE/clickhouse"
+mkdir -p "$FLOX_ENV_CACHE/clickhouse/data"
+mkdir -p "$FLOX_ENV_CACHE/clickhouse/tmp"
+mkdir -p "$FLOX_ENV_CACHE/clickhouse/user_files"
+mkdir -p "$FLOX_ENV_CACHE/clickhouse/format_schemas"
 mkdir -p "$FLOX_ENV_PROJECT/airbyte"
 '''
 
@@ -79,15 +96,99 @@ exec minio server "$FLOX_ENV_CACHE/minio/data" \
 '''
 is-daemon = true
 
+[services.minio.shutdown]
+command = '''
+python - <<'PY'
+import os
+import signal
+
+needle = f"minio\0server\0{os.environ['FLOX_ENV_CACHE']}/minio/data"
+
+for pid in os.listdir('/proc'):
+    if not pid.isdigit():
+        continue
+    try:
+        with open(f'/proc/{pid}/cmdline', 'rb') as fh:
+            cmdline = fh.read().decode(errors='ignore')
+    except OSError:
+        continue
+    if needle in cmdline:
+        os.kill(int(pid), signal.SIGTERM)
+PY
+'''
+
 [services.clickhouse]
 command = '''
-exec clickhouse server \
-  --path "$FLOX_ENV_CACHE/clickhouse" \
-  --listen_host "$CLICKHOUSE_HOST" \
-  --http_port "$CLICKHOUSE_HTTP_PORT" \
-  --tcp_port "$CLICKHOUSE_TCP_PORT"
+clickhouse_host="${CLICKHOUSE_HOST:-127.0.0.1}"
+clickhouse_http_port="${CLICKHOUSE_HTTP_PORT:-8123}"
+clickhouse_tcp_port="${CLICKHOUSE_TCP_PORT:-9002}"
+
+cat > "$FLOX_ENV_CACHE/clickhouse/config.xml" <<EOF
+<clickhouse>
+  <logger>
+    <level>warning</level>
+    <console>1</console>
+    <log>$FLOX_ENV_CACHE/logs/clickhouse.log</log>
+    <errorlog>$FLOX_ENV_CACHE/logs/clickhouse.err.log</errorlog>
+    <size>1000M</size>
+    <count>3</count>
+  </logger>
+  <http_port>$clickhouse_http_port</http_port>
+  <tcp_port>$clickhouse_tcp_port</tcp_port>
+  <listen_host>$clickhouse_host</listen_host>
+  <path>$FLOX_ENV_CACHE/clickhouse/data/</path>
+  <tmp_path>$FLOX_ENV_CACHE/clickhouse/tmp/</tmp_path>
+  <user_files_path>$FLOX_ENV_CACHE/clickhouse/user_files/</user_files_path>
+  <format_schema_path>$FLOX_ENV_CACHE/clickhouse/format_schemas/</format_schema_path>
+  <users_config>$FLOX_ENV_CACHE/clickhouse/users.xml</users_config>
+</clickhouse>
+EOF
+
+cat > "$FLOX_ENV_CACHE/clickhouse/users.xml" <<EOF
+<clickhouse>
+  <profiles>
+    <default />
+  </profiles>
+  <users>
+    <default>
+      <password></password>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>1</access_management>
+      <named_collection_control>1</named_collection_control>
+    </default>
+  </users>
+  <quotas>
+    <default>
+      <interval>
+        <duration>3600</duration>
+        <queries>0</queries>
+        <errors>0</errors>
+        <result_rows>0</result_rows>
+        <read_rows>0</read_rows>
+        <execution_time>0</execution_time>
+      </interval>
+    </default>
+  </quotas>
+</clickhouse>
+EOF
+
+exec clickhouse-server \
+  --config-file "$FLOX_ENV_CACHE/clickhouse/config.xml" \
+  --pidfile "$FLOX_ENV_CACHE/clickhouse/clickhouse.pid"
 '''
 is-daemon = true
+
+[services.clickhouse.shutdown]
+command = '''
+pidfile="$FLOX_ENV_CACHE/clickhouse/clickhouse.pid"
+if [ -f "$pidfile" ]; then
+  kill "$(cat "$pidfile")" 2>/dev/null || true
+fi
+'''
 
 [services.airbyte]
 command = '''

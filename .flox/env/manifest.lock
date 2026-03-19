@@ -1,10 +1,11 @@
 {
   "lockfile-version": 1,
   "manifest": {
-    "version": 1,
+    "schema-version": "1.10.0",
     "install": {
       "boto3": {
-        "pkg-path": "python311Packages.boto3"
+        "pkg-path": "python311Packages.boto3",
+        "outputs": "all"
       },
       "clickhouse": {
         "pkg-path": "clickhouse"
@@ -16,43 +17,58 @@
         "pkg-path": "docker-compose"
       },
       "duckdb": {
-        "pkg-path": "python311Packages.duckdb"
+        "pkg-path": "python311Packages.duckdb",
+        "outputs": "all"
+      },
+      "flox-mcp-server": {
+        "pkg-path": "flox/flox-mcp-server",
+        "pkg-group": "flox-mcp-server"
       },
       "minio": {
         "pkg-path": "minio"
       },
       "pandas": {
-        "pkg-path": "python311Packages.pandas"
+        "pkg-path": "python311Packages.pandas",
+        "outputs": "all"
       },
       "pip": {
-        "pkg-path": "python311Packages.pip"
+        "pkg-path": "python311Packages.pip",
+        "outputs": "all"
       },
       "polars": {
-        "pkg-path": "python311Packages.polars"
+        "pkg-path": "python311Packages.polars",
+        "outputs": "all"
       },
       "pyarrow": {
-        "pkg-path": "python311Packages.pyarrow"
+        "pkg-path": "python311Packages.pyarrow",
+        "outputs": "all"
       },
       "pyiceberg": {
         "pkg-path": "python311Packages.pyiceberg",
         "systems": [
           "x86_64-linux"
-        ]
+        ],
+        "outputs": "all"
       },
       "python": {
-        "pkg-path": "python311Full"
+        "pkg-path": "python311Full",
+        "outputs": "all"
       },
       "requests": {
-        "pkg-path": "python311Packages.requests"
+        "pkg-path": "python311Packages.requests",
+        "outputs": "all"
       },
       "s3fs": {
-        "pkg-path": "python311Packages.s3fs"
+        "pkg-path": "python311Packages.s3fs",
+        "outputs": "all"
       },
       "sqlalchemy": {
-        "pkg-path": "python311Packages.sqlalchemy"
+        "pkg-path": "python311Packages.sqlalchemy",
+        "outputs": "all"
       },
       "uv": {
-        "pkg-path": "uv"
+        "pkg-path": "uv",
+        "outputs": "all"
       }
     },
     "vars": {
@@ -70,7 +86,7 @@
       "S3_REGION": "us-east-1"
     },
     "hook": {
-      "on-activate": "mkdir -p \"$FLOX_ENV_CACHE/logs\"\nmkdir -p \"$FLOX_ENV_CACHE/minio/data\"\nmkdir -p \"$FLOX_ENV_CACHE/clickhouse\"\nmkdir -p \"$FLOX_ENV_PROJECT/airbyte\"\n"
+      "on-activate": "mkdir -p \"$FLOX_ENV_CACHE/logs\"\nmkdir -p \"$FLOX_ENV_CACHE/minio/data\"\nmkdir -p \"$FLOX_ENV_CACHE/clickhouse/data\"\nmkdir -p \"$FLOX_ENV_CACHE/clickhouse/tmp\"\nmkdir -p \"$FLOX_ENV_CACHE/clickhouse/user_files\"\nmkdir -p \"$FLOX_ENV_CACHE/clickhouse/format_schemas\"\nmkdir -p \"$FLOX_ENV_PROJECT/airbyte\"\n"
     },
     "profile": {
       "common": "de_airbyte_up() {\n  docker compose -f \"${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}\" up -d\n}\n\nde_airbyte_down() {\n  docker compose -f \"${AIRBYTE_COMPOSE_FILE:-$FLOX_ENV_PROJECT/airbyte/docker-compose.yaml}\" down\n}\n\nde_clickhouse_query() {\n  clickhouse client --host \"$CLICKHOUSE_HOST\" --port \"$CLICKHOUSE_TCP_PORT\" --query \"$*\"\n}\n\nde_iceberg_env() {\n  printf 'S3 endpoint: %s\\nWarehouse: %s\\nCatalog: %s\\n' \"$S3_ENDPOINT_URL\" \"$ICEBERG_WAREHOUSE\" \"$ICEBERG_CATALOG_NAME\"\n}\n"
@@ -90,12 +106,18 @@
         }
       },
       "clickhouse": {
-        "command": "exec clickhouse server \\\n  --path \"$FLOX_ENV_CACHE/clickhouse\" \\\n  --listen_host \"$CLICKHOUSE_HOST\" \\\n  --http_port \"$CLICKHOUSE_HTTP_PORT\" \\\n  --tcp_port \"$CLICKHOUSE_TCP_PORT\"\n",
-        "is-daemon": true
+        "command": "clickhouse_host=\"${CLICKHOUSE_HOST:-127.0.0.1}\"\nclickhouse_http_port=\"${CLICKHOUSE_HTTP_PORT:-8123}\"\nclickhouse_tcp_port=\"${CLICKHOUSE_TCP_PORT:-9002}\"\n\ncat > \"$FLOX_ENV_CACHE/clickhouse/config.xml\" <<EOF\n<clickhouse>\n  <logger>\n    <level>warning</level>\n    <console>1</console>\n    <log>$FLOX_ENV_CACHE/logs/clickhouse.log</log>\n    <errorlog>$FLOX_ENV_CACHE/logs/clickhouse.err.log</errorlog>\n    <size>1000M</size>\n    <count>3</count>\n  </logger>\n  <http_port>$clickhouse_http_port</http_port>\n  <tcp_port>$clickhouse_tcp_port</tcp_port>\n  <listen_host>$clickhouse_host</listen_host>\n  <path>$FLOX_ENV_CACHE/clickhouse/data/</path>\n  <tmp_path>$FLOX_ENV_CACHE/clickhouse/tmp/</tmp_path>\n  <user_files_path>$FLOX_ENV_CACHE/clickhouse/user_files/</user_files_path>\n  <format_schema_path>$FLOX_ENV_CACHE/clickhouse/format_schemas/</format_schema_path>\n  <users_config>$FLOX_ENV_CACHE/clickhouse/users.xml</users_config>\n</clickhouse>\nEOF\n\ncat > \"$FLOX_ENV_CACHE/clickhouse/users.xml\" <<EOF\n<clickhouse>\n  <profiles>\n    <default />\n  </profiles>\n  <users>\n    <default>\n      <password></password>\n      <networks>\n        <ip>::/0</ip>\n      </networks>\n      <profile>default</profile>\n      <quota>default</quota>\n      <access_management>1</access_management>\n      <named_collection_control>1</named_collection_control>\n    </default>\n  </users>\n  <quotas>\n    <default>\n      <interval>\n        <duration>3600</duration>\n        <queries>0</queries>\n        <errors>0</errors>\n        <result_rows>0</result_rows>\n        <read_rows>0</read_rows>\n        <execution_time>0</execution_time>\n      </interval>\n    </default>\n  </quotas>\n</clickhouse>\nEOF\n\nexec clickhouse-server \\\n  --config-file \"$FLOX_ENV_CACHE/clickhouse/config.xml\" \\\n  --pidfile \"$FLOX_ENV_CACHE/clickhouse/clickhouse.pid\"\n",
+        "is-daemon": true,
+        "shutdown": {
+          "command": "pidfile=\"$FLOX_ENV_CACHE/clickhouse/clickhouse.pid\"\nif [ -f \"$pidfile\" ]; then\n  kill \"$(cat \"$pidfile\")\" 2>/dev/null || true\nfi\n"
+        }
       },
       "minio": {
         "command": "export MINIO_ROOT_USER\nexport MINIO_ROOT_PASSWORD\nexec minio server \"$FLOX_ENV_CACHE/minio/data\" \\\n  --address \"$MINIO_HOST:$MINIO_PORT\" \\\n  --console-address \"$MINIO_HOST:$MINIO_CONSOLE_PORT\"\n",
-        "is-daemon": true
+        "is-daemon": true,
+        "shutdown": {
+          "command": "python - <<'PY'\nimport os\nimport signal\n\nneedle = f\"minio\\0server\\0{os.environ['FLOX_ENV_CACHE']}/minio/data\"\n\nfor pid in os.listdir('/proc'):\n    if not pid.isdigit():\n        continue\n    try:\n        with open(f'/proc/{pid}/cmdline', 'rb') as fh:\n            cmdline = fh.read().decode(errors='ignore')\n    except OSError:\n        continue\n    if needle in cmdline:\n        os.kill(int(pid), signal.SIGTERM)\nPY\n"
+        }
       }
     },
     "build": {
@@ -105,6 +127,66 @@
     }
   },
   "packages": [
+    {
+      "attr_path": "flox-mcp-server",
+      "broken": false,
+      "derivation": "/nix/store/pdimfq1f3l2kmx2plr6xpas8abby5y2p-flox-mcp-server-0.2.2.drv",
+      "description": "MCP server for Flox package manager",
+      "install_id": "flox-mcp-server",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/mcp-server?rev=61f940167b7a1d245e314fb84668232ed7195f93",
+      "name": "flox-mcp-server-0.2.2",
+      "pname": "flox-mcp-server",
+      "rev": "61f940167b7a1d245e314fb84668232ed7195f93",
+      "rev_count": 30,
+      "rev_date": "2026-02-03T16:40:14Z",
+      "scrape_date": "2026-03-13T21:18:47.043539967Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.2.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/6zjsiagcmx2qflf30kgcnfakipynghlk-flox-mcp-server-0.2.2-dist",
+        "out": "/nix/store/h4y7xqn88gyxd7vymv40y9jnf4l06p5i-flox-mcp-server-0.2.2"
+      },
+      "system": "aarch64-linux",
+      "group": "flox-mcp-server",
+      "priority": 5
+    },
+    {
+      "attr_path": "flox-mcp-server",
+      "broken": false,
+      "derivation": "/nix/store/nnqy64nl48nwnz26x2kwagr10ryz54yg-flox-mcp-server-0.2.2.drv",
+      "description": "MCP server for Flox package manager",
+      "install_id": "flox-mcp-server",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/mcp-server?rev=61f940167b7a1d245e314fb84668232ed7195f93",
+      "name": "flox-mcp-server-0.2.2",
+      "pname": "flox-mcp-server",
+      "rev": "61f940167b7a1d245e314fb84668232ed7195f93",
+      "rev_count": 30,
+      "rev_date": "2026-02-03T16:40:14Z",
+      "scrape_date": "2026-03-13T21:18:47.043551128Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.2.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/g2xdbvax1d4yv0czq31pkfnyf5snynh1-flox-mcp-server-0.2.2-dist",
+        "out": "/nix/store/xwcqr4jvj2fqnm6jhxaakigbry38y7vk-flox-mcp-server-0.2.2"
+      },
+      "system": "x86_64-linux",
+      "group": "flox-mcp-server",
+      "priority": 5
+    },
     {
       "attr_path": "python311Packages.boto3",
       "broken": false,
